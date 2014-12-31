@@ -23,9 +23,11 @@ gulp.task('test', function (next) {
     next();
 });
 
-
 gulp.task('build', function () {
     return gulp.src('src/*.js')
+        .pipe(rename(function (path) {
+            path.basename += ".md";
+        }))
         .pipe(gulp.dest('dist'))
         .pipe(rename(function (path) {
             path.basename += ".min";

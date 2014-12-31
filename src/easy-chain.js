@@ -20,6 +20,20 @@
             return type === 'function' || type === "object" && !!value;
         },
 
+        arrayfy = function (_arguments) {
+            return _arguments.length > 0 ? Array.prototype.slice.call(_arguments) : [];
+        },
+
+        createObject = (function () {
+            function F() {
+            }
+
+            return function (o) {
+                F.prototype = o;
+                return new F()
+            };
+        })(),
+
         bind = function (func, context) {
             return function () {
                 return func.apply(context, arguments);
@@ -49,14 +63,13 @@
             });
         },
 
-        countTrue = function (array) {
-            var counter = 0;
-            forEach(array, function (value) {
-                if (!!value) {
-                    counter++;
-                }
-            });
-            return counter;
+        map = function (array, callback) {
+            var newArray = [], value;
+            for (var i = 0; i < array.length; i++) {
+                value = array[i];
+                newArray.push(callback(value, i));
+            }
+            return newArray;
         },
 
         isJQueryDeferred = jQuery ? function (value) {
@@ -115,37 +128,44 @@
         this._doneCallbacks = [];
         this._failCallbacks = [];
         this._status = '';
+        this._arguments = null;
     }
 
     Deferred.prototype.resolve = function () {
-        var args = arguments.length > 0 ? arguments : [];
         if (!this._status) {
-            forEach(this._doneCallbacks, function (callback) {
-                callback.apply({}, args);
-            });
             this._status = "resolved";
+            this._arguments = arrayfy(arguments);
+            forEach(this._doneCallbacks, bind(function (callback) {
+                callback.apply(null, this._arguments);
+            }, this));
         }
         return this;
     };
 
     Deferred.prototype.reject = function () {
-        var args = arguments.length > 0 ? arguments : [];
         if (!this._status) {
-            forEach(this._failCallbacks, function (callback) {
-                callback.apply({}, args);
-            });
             this._status = "rejected";
+            this._arguments = arrayfy(arguments);
+            forEach(this._failCallbacks, bind(function (callback) {
+                callback.apply(null, this._arguments);
+            }, this));
         }
         return this;
     };
 
     Deferred.prototype.done = function (callback) {
         this._doneCallbacks.push(callback);
+        if (this._status === "resolved") {
+            callback.apply(null, this._arguments);
+        }
         return this;
     };
 
     Deferred.prototype.fail = function (callback) {
         this._failCallbacks.push(callback);
+        if (this._status === "rejected") {
+            callback.apply(null, this._arguments);
+        }
         return this;
     };
 
@@ -153,64 +173,118 @@
         return new Promise(this);
     };
 
+    Deferred.whenAllDone = function (deferreds) {
+        var _deferred = new Deferred(),
+            counter = 0,
+            total = deferreds.length;
+        forEach(deferreds, function (deferred) {
+            deferred.done(function () {
+                counter++;
+                if (counter === total) {
+                    _deferred.resolve();
+                }
+            })
+        });
+        return _deferred.promise();
+    };
+
+    Deferred.whenAnyDone = function (deferreds) {
+        var _deferred = new Deferred();
+        forEach(deferreds, function (deferred) {
+            deferred.done(function () {
+                _deferred.resolve();
+            })
+        });
+        return _deferred.promise();
+    };
+
+    //==================================================================
+    // Queue Item
+
+    function QueueItem(callback) {
+        this.callback = callback;
+        this.deferred = new Deferred();
+        this.value = undefined;
+
+        this.deferred.done(bind(function () {
+            this.value = arrayfy(arguments);
+        }, this));
+    }
+
     //==================================================================
     // Queue
 
-    function Queue(type, callbacks) {
+    function Queue(type, timeout, callbacks) {
         this.type = type;
-        this.callbacks = callbacks;
-        this.nextHasBeenCalled = false;
-        this.eventValues = callbacks ? new Array(callbacks.length) : [];
-        this.onComplete = null;
+        this.queueItems = map(callbacks, function (callback) {
+            return new QueueItem(callback);
+        });
+        this.deferred = new Deferred();
+        this.timeout = timeout;
+        this.timeoutId = null;
+        this._initialize();
     }
 
-    Queue.prototype._attemptToGoToNext = function (callbackIndex) {
-        return bind(function () {
-            if (this.type === Queue.WAIT) {
-                this.eventValues = arguments[0];
-            } else if (this.type === Queue.SINGLE) {
-                this.eventValues = Array.prototype.slice.call(arguments);
-            } else {
-                this.eventValues[callbackIndex] = Array.prototype.slice.call(arguments);
-            }
-
-            if (!this.nextHasBeenCalled
-                && (this.type === Queue.SINGLE || this.type === Queue.WAIT || this.type === Queue.FIRST
-                || (this.type === Queue.ALL && countTrue(this.eventValues) === this.callbacks.length)
-                )
-            ) {
-                this.nextHasBeenCalled = true;
-                this.onComplete();
-            }
-        }, this);
+    Queue.prototype._initialize = function () {
+        var deferred;
+        if (this.type === Queue.SINGLE
+            || this.type === Queue.ALL
+            || this.type === Queue.WAIT) {
+            deferred = Deferred.whenAllDone(map(this.queueItems, function (queueItem) {
+                return queueItem.deferred.promise();
+            }));
+        } else if (this.type === Queue.FIRST) {
+            deferred = Deferred.whenAnyDone(map(this.queueItems, function (queueItem) {
+                return queueItem.deferred.promise();
+            }));
+        }
+        deferred.done(bind(function () {
+            clearTimeout(this.timeoutId);
+            this.deferred.resolve();
+        }, this));
     };
 
     Queue.prototype.run = function (options) {
-        this.onComplete = options.onComplete;
-        forEach(this.callbacks, bind(function (callback, callbackIndex) {
-            var returnedValue;
-            if (isFunction(callback)) {
-                returnedValue = callback(this._attemptToGoToNext(callbackIndex), options.prevEventValues);
+        forEach(this.queueItems, bind(function (queueItem) {
+            var resolve = function () {
+                    queueItem.deferred.resolve.apply(queueItem.deferred, arrayfy(arguments));
+                },
+                returnedValue;
+            if (isFunction(queueItem.callback)) {
+                returnedValue = queueItem.callback(options.passedValues, resolve);
                 if (isJQueryDeferred(returnedValue)) {
-                    returnedValue.done(this._attemptToGoToNext(callbackIndex), options.prevEventValues);
+                    returnedValue.done(resolve);
                 }
-            } else if (isJQueryDeferred(callback)) {
-                callback.done(this._attemptToGoToNext(callbackIndex), options.prevEventValues);
-            } else if (callback instanceof EasyChain) {
-                callback._runQueues(0, {
-                    onComplete: bind(function () {
-                        this._attemptToGoToNext(callbackIndex)(options.prevEventValues);
-                    }, this)
-                });
+            } else if (queueItem.callback instanceof EasyChain) {
+                queueItem.callback.runQueuesFrom(0).done(resolve);
             }
         }, this));
+
+        this.timeoutId = setTimeout(bind(function () {
+            this.deferred.reject();
+        }, this), (this.timeout || EasyChain.TIMEOUT_MSEC));
+
+        return this.deferred.promise();
+    };
+
+    Queue.prototype.getType = function () {
+        return this.type;
+    };
+
+    Queue.prototype.getValues = function () {
+        if (this.type === Queue.ALL || this.type === Queue.FIRST) {
+            return map(this.queueItems, function (queueItem) {
+                return queueItem.value;
+            });
+        } else if (this.type === Queue.SINGLE || this.type === Queue.WAIT) {
+            return this.queueItems[0].value;
+        }
     };
 
     Queue.ALL = 'all';
     Queue.FIRST = 'first';
     Queue.SINGLE = 'single';
     Queue.WAIT = 'wait';
-
 
     //==================================================================
     // PromiseChain
@@ -235,41 +309,45 @@
         return this;
     };
 
-    EasyChain.prototype._runQueues = function (index, options) {
+    EasyChain.prototype.runQueuesFrom = function (index) {
         var queue = this._queues[index],
             prevQueue = this._queues[index - 1],
-            timeoutId;
+            prevQueueValues = prevQueue ? prevQueue.getValues() : undefined,
+            deferred = new Deferred();
 
         if (queue) {
-            timeoutId = setTimeout(bind(function () {
-                this._fireEvent(
-                    EasyChain.TIMEOUT_ERROR,
-                    new Event(EasyChain.TIMEOUT_ERROR, this, {
-                        values: queue.eventValues,
-                        queueType: queue.type,
-                        index: index
-                    })
-                );
-            }, this), (this._timeout || EasyChain.TIMEOUT_MSEC));
-
-            queue.run({
-                onComplete: bind(function () {
-                    clearTimeout(timeoutId);
+            queue
+                .run({
+                    passedValues: prevQueueValues
+                })
+                .done(bind(function () {
                     this._fireEvent(
                         EasyChain.PROGRESS,
                         new Event(EasyChain.PROGRESS, this, {
-                            values: queue.eventValues,
-                            queueType: queue.type,
+                            values: queue.getValues(),
+                            queueType: queue.getType(),
                             index: index
                         })
                     );
-                    this._runQueues(index + 1, options);
-                }, this),
-                prevEventValues: prevQueue ? prevQueue.eventValues : undefined
-            });
-        } else if (isFunction(options.onComplete)) {
-            options.onComplete();
+                    this.runQueuesFrom(index + 1).done(function () {
+                        deferred.resolve(queue.getValues());
+                    });
+                }, this))
+                .fail(bind(function () {
+                    this._fireEvent(
+                        EasyChain.TIMEOUT_ERROR,
+                        new Event(EasyChain.TIMEOUT_ERROR, this, {
+                            values: queue.getValues(),
+                            queueType: queue.getType(),
+                            index: index
+                        })
+                    );
+                }, this));
+        } else {
+            deferred.resolve(prevQueueValues);
         }
+
+        return deferred.promise();
     };
 
     // - - - - - - - - - - - - - - - - - - -
@@ -277,7 +355,7 @@
 
     EasyChain.prototype.single = function (callback) {
         if (isFunction(callback)) {
-            this._queues.push(new Queue(Queue.SINGLE, [callback]));
+            this._queues.push(new Queue(Queue.SINGLE, this._timeout, [callback]));
         } else {
             throw new TypeError("single() takes only function.");
         }
@@ -286,19 +364,19 @@
 
     EasyChain.prototype.all = function () {
         var callbacks = isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments);
-        this._queues.push(new Queue(Queue.ALL, callbacks));
+        this._queues.push(new Queue(Queue.ALL, this._timeout, callbacks));
         return this;
     };
 
     EasyChain.prototype.first = function () {
         var callbacks = isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments);
-        this._queues.push(new Queue(Queue.FIRST, callbacks));
+        this._queues.push(new Queue(Queue.FIRST, this._timeout, callbacks));
         return this;
     };
 
     EasyChain.prototype.wait = function (msec) {
         if (isNumber(msec)) {
-            this._queues.push(new Queue(Queue.WAIT, [function (next) {
+            this._queues.push(new Queue(Queue.WAIT, this._timeout, [function (values, next) {
                 setTimeout(function () {
                     next(msec);
                 }, msec);
@@ -310,8 +388,8 @@
     };
 
     EasyChain.prototype.run = function () {
-        this._runQueues(0, {
-            onComplete: bind(function () {
+        this.runQueuesFrom(0)
+            .done(bind(function () {
                 this._fireEvent(
                     EasyChain.COMPLETE,
                     new Event(EasyChain.COMPLETE, this, {
@@ -319,8 +397,7 @@
                         length: this._queues.length
                     })
                 );
-            }, this)
-        });
+            }, this));
         return this;
     };
 
