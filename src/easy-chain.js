@@ -90,6 +90,69 @@
         this.context = context;
     }
 
+
+    //==================================================================
+    // Promise
+
+    function Promise(deferred) {
+        this._deferred = deferred;
+    }
+
+    Promise.prototype.done = function (callback) {
+        this._deferred.done(callback);
+        return this;
+    };
+
+    Promise.prototype.fail = function (callback) {
+        this._deferred.fail(callback);
+        return this;
+    };
+
+    //==================================================================
+    // Deferred
+
+    function Deferred() {
+        this._doneCallbacks = [];
+        this._failCallbacks = [];
+        this._status = '';
+    }
+
+    Deferred.prototype.resolve = function () {
+        var args = arguments.length > 0 ? arguments : [];
+        if (!this._status) {
+            forEach(this._doneCallbacks, function (callback) {
+                callback.apply({}, args);
+            });
+            this._status = "resolved";
+        }
+        return this;
+    };
+
+    Deferred.prototype.reject = function () {
+        var args = arguments.length > 0 ? arguments : [];
+        if (!this._status) {
+            forEach(this._failCallbacks, function (callback) {
+                callback.apply({}, args);
+            });
+            this._status = "rejected";
+        }
+        return this;
+    };
+
+    Deferred.prototype.done = function (callback) {
+        this._doneCallbacks.push(callback);
+        return this;
+    };
+
+    Deferred.prototype.fail = function (callback) {
+        this._failCallbacks.push(callback);
+        return this;
+    };
+
+    Deferred.prototype.promise = function () {
+        return new Promise(this);
+    };
+
     //==================================================================
     // Queue
 
@@ -326,5 +389,6 @@
     EasyChain.TIMEOUT_ERROR = 'timeout-error';
 
     global.EasyChain = EasyChain;
+    global.EasyChain.Deferred = Deferred;
 
 }(this));
