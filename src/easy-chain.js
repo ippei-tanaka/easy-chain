@@ -59,7 +59,7 @@
             return counter;
         },
 
-        isJQueryPromise = jQuery ? function (value) {
+        isJQueryDeferred = jQuery ? function (value) {
             var thenString = String(jQuery.Deferred().then).substring(10, 20);
             if (!isObject(value) || !isFunction(value.then)) {
                 return false;
@@ -122,17 +122,23 @@
         }, this);
     };
 
-    Queue.prototype.run = function (onComplete) {
-        this.onComplete = onComplete;
+    Queue.prototype.run = function (options) {
+        this.onComplete = options.onComplete;
         forEach(this.callbacks, bind(function (callback, callbackIndex) {
             var returnedValue;
             if (isFunction(callback)) {
-                returnedValue = callback(this._attemptToGoToNext(callbackIndex));
-                if (isJQueryPromise(returnedValue)) {
-                    returnedValue.done(this._attemptToGoToNext(callbackIndex));
+                returnedValue = callback(this._attemptToGoToNext(callbackIndex), options.prevEventValues);
+                if (isJQueryDeferred(returnedValue)) {
+                    returnedValue.done(this._attemptToGoToNext(callbackIndex), options.prevEventValues);
                 }
+            } else if (isJQueryDeferred(callback)) {
+                callback.done(this._attemptToGoToNext(callbackIndex), options.prevEventValues);
             } else if (callback instanceof EasyChain) {
-                callback._runQueues(0, this._attemptToGoToNext(callbackIndex));
+                callback._runQueues(0, {
+                    onComplete: bind(function () {
+                        this._attemptToGoToNext(callbackIndex)(options.prevEventValues);
+                    }, this)
+                });
             }
         }, this));
     };
@@ -146,14 +152,13 @@
     //==================================================================
     // PromiseChain
 
-    function EasyChain(options) {
-        options = options || {};
+    function EasyChain() {
         this._queues = [];
         this._eventListeners = {};
         this._eventListeners[EasyChain.COMPLETE] = [];
         this._eventListeners[EasyChain.TIMEOUT_ERROR] = [];
         this._eventListeners[EasyChain.PROGRESS] = [];
-        this._timeout = options.timeout;
+        this._timeout = null;
     }
 
     // - - - - - - - - - - - - - - - - - - -
@@ -167,8 +172,9 @@
         return this;
     };
 
-    EasyChain.prototype._runQueues = function (index, onComplete) {
+    EasyChain.prototype._runQueues = function (index, options) {
         var queue = this._queues[index],
+            prevQueue = this._queues[index - 1],
             timeoutId;
 
         if (queue) {
@@ -183,20 +189,23 @@
                 );
             }, this), (this._timeout || EasyChain.TIMEOUT_MSEC));
 
-            queue.run(bind(function () {
-                clearTimeout(timeoutId);
-                this._fireEvent(
-                    EasyChain.PROGRESS,
-                    new Event(EasyChain.PROGRESS, this, {
-                        values: queue.eventValues,
-                        queueType: queue.type,
-                        index: index
-                    })
-                );
-                this._runQueues(index + 1, onComplete);
-            }, this));
-        } else {
-            onComplete();
+            queue.run({
+                onComplete: bind(function () {
+                    clearTimeout(timeoutId);
+                    this._fireEvent(
+                        EasyChain.PROGRESS,
+                        new Event(EasyChain.PROGRESS, this, {
+                            values: queue.eventValues,
+                            queueType: queue.type,
+                            index: index
+                        })
+                    );
+                    this._runQueues(index + 1, options);
+                }, this),
+                prevEventValues: prevQueue ? prevQueue.eventValues : undefined
+            });
+        } else if (isFunction(options.onComplete)) {
+            options.onComplete();
         }
     };
 
@@ -238,15 +247,17 @@
     };
 
     EasyChain.prototype.run = function () {
-        this._runQueues(0, bind(function () {
-            this._fireEvent(
-                EasyChain.COMPLETE,
-                new Event(EasyChain.COMPLETE, this, {
-                    type: EasyChain.COMPLETE,
-                    length: this._queues.length
-                })
-            );
-        }, this));
+        this._runQueues(0, {
+            onComplete: bind(function () {
+                this._fireEvent(
+                    EasyChain.COMPLETE,
+                    new Event(EasyChain.COMPLETE, this, {
+                        type: EasyChain.COMPLETE,
+                        length: this._queues.length
+                    })
+                );
+            }, this)
+        });
         return this;
     };
 
@@ -281,26 +292,31 @@
         return this;
     };
 
+    EasyChain.prototype.setTimeout = function (msec) {
+        this._timeout = msec;
+        return this;
+    };
+
     // - - - - - - - - - - - - - - - - - - -
     // Public Static Methods
 
     EasyChain.wait = function (msec) {
-        var instance =  new EasyChain();
+        var instance = new EasyChain();
         return instance.wait(msec);
     };
 
     EasyChain.single = function (callback) {
-        var instance =  new EasyChain();
+        var instance = new EasyChain();
         return instance.single(callback);
     };
 
     EasyChain.all = function () {
-        var instance =  new EasyChain();
+        var instance = new EasyChain();
         return instance.all.apply(instance, arguments);
     };
 
     EasyChain.first = function () {
-        var instance =  new EasyChain();
+        var instance = new EasyChain();
         return instance.first.apply(instance, arguments);
     };
 

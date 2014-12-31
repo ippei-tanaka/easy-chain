@@ -9,10 +9,8 @@ describe("EasyChain", function () {
 
     beforeEach(function () {
         originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
-        jasmine.DEFAULT_TIMEOUT_INTERVAL = 500;
-        chain = new EasyChain({
-            timeout: timeout
-        });
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 1000;
+        chain = new EasyChain().setTimeout(timeout);
         chain2 = new EasyChain();
         chain3 = new EasyChain();
         spiedFunction = jasmine.createSpy('spiedFunction');
@@ -21,10 +19,11 @@ describe("EasyChain", function () {
     it("should run sequentially functions.", function () {
         chain
             .single(function (next) {
-                next();
+                next("He", "llo");
             })
-            .single(function (next) {
+            .single(function (next, values) {
                 spiedFunction();
+                expect(values).toEqual(["He", "llo"]);
                 next();
             })
             .run();
@@ -58,16 +57,19 @@ describe("EasyChain", function () {
 
     it("should run all functions in parallel.", function () {
         chain
-            .all(function (next) {
+            .all(function (next, values) {
                 spiedFunction();
-                next();
-            }, function (next) {
+                next(1, 2, 3);
+                expect(values).toBeUndefined();
+            }, function (next, values) {
                 spiedFunction();
-                next();
+                next(4, 5);
+                expect(values).toBeUndefined();
             })
-            .all([function (next) {
+            .all([function (next, values) {
                 spiedFunction();
                 next();
+                expect(values).toEqual([[1, 2, 3], [4, 5]]);
             }, function (next) {
                 spiedFunction();
                 next();
@@ -360,6 +362,30 @@ describe("EasyChain", function () {
             done();
         }, 300);
     });
+
+    it("should be working with jQuery ajax calls.", function (done) {
+
+        EasyChain
+            .all(
+                $.getJSON('http://echo.jsontest.com/key1/value1'),
+                $.getJSON('http://echo.jsontest.com/key2/value2').promise(),
+                EasyChain.wait(100)
+            )
+            .single(function (next, values) {
+                expect(values[0][0]).toEqual({"key1": "value1"});
+                expect(values[1][0]).toEqual({"key2": "value2"});
+                //expect(values[2]).toEqual(100);
+                return $.getJSON('http://echo.jsontest.com/key3/value3');
+            })
+            .single(function (next, values) {
+                expect(values[0]).toEqual({"key3": "value3"});
+                next();
+                done();
+            })
+            .setTimeout(5000)
+            .run();
+    });
+
 
     afterEach(function () {
         jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
