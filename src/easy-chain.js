@@ -127,9 +127,12 @@
     function Deferred() {
         this._doneCallbacks = [];
         this._failCallbacks = [];
-        this._status = '';
+        this._status = null;
         this._arguments = null;
     }
+
+    // - - - - - - - - - - - - - - - - - - -
+    // Public Static Methods
 
     Deferred.prototype.resolve = function () {
         if (!this._status) {
@@ -214,49 +217,74 @@
     //==================================================================
     // Queue
 
-    function Queue(type, timeout, callbacks) {
+    function Queue(type, callbacks, timeout) {
+        this._initialize(type, callbacks, timeout);
+    }
+
+    // - - - - - - - - - - - - - - - - - - -
+    // Private Methods
+
+    Queue.prototype._initialize = function (type, callbacks, timeout) {
         this.type = type;
-        this.queueItems = map(callbacks, function (callback) {
-            return new QueueItem(callback);
-        });
         this.deferred = new Deferred();
         this.timeout = timeout;
         this.timeoutId = null;
-        this._initialize();
-    }
+        this.queueItems = null;
+        this.waitTime = null;
 
-    Queue.prototype._initialize = function () {
-        var deferred;
         if (this.type === Queue.SINGLE
-            || this.type === Queue.ALL
-            || this.type === Queue.WAIT) {
-            deferred = Deferred.whenAllDone(map(this.queueItems, function (queueItem) {
-                return queueItem.deferred.promise();
-            }));
-        } else if (this.type === Queue.FIRST) {
-            deferred = Deferred.whenAnyDone(map(this.queueItems, function (queueItem) {
-                return queueItem.deferred.promise();
-            }));
+            || this.type === Queue.ALL) {
+            this.queueItems = map(callbacks, function (callback) {
+                return new QueueItem(callback);
+            });
+            Deferred
+                .whenAllDone(map(this.queueItems, function (queueItem) {
+                    return queueItem.deferred.promise();
+                }))
+                .done(bind(function () {
+                    clearTimeout(this.timeoutId);
+                    this.deferred.resolve();
+                }, this));
+        } else if (this.type === Queue.ANY) {
+            this.queueItems = map(callbacks, function (callback) {
+                return new QueueItem(callback);
+            });
+            Deferred
+                .whenAnyDone(map(this.queueItems, function (queueItem) {
+                    return queueItem.deferred.promise();
+                }))
+                .done(bind(function () {
+                    clearTimeout(this.timeoutId);
+                    this.deferred.resolve();
+                }, this));
+        } else if (this.type === Queue.WAIT) {
+            this.waitTime = callbacks;
+            this.queueItems = [new QueueItem(bind(function () {
+                setTimeout(bind(function () {
+                    this.deferred.resolve();
+                }, this), this.waitTime);
+            }, this))];
         }
-        deferred.done(bind(function () {
-            clearTimeout(this.timeoutId);
-            this.deferred.resolve();
-        }, this));
     };
 
+    // - - - - - - - - - - - - - - - - - - -
+    // Public Methods
+
     Queue.prototype.run = function (options) {
+        options = options || {};
+
         forEach(this.queueItems, bind(function (queueItem) {
             var resolve = function () {
                     queueItem.deferred.resolve.apply(queueItem.deferred, arrayfy(arguments));
                 },
                 returnedValue;
             if (isFunction(queueItem.callback)) {
-                returnedValue = queueItem.callback(options.passedValues, resolve);
+                returnedValue = queueItem.callback(resolve, options.prevQueue);
                 if (isJQueryDeferred(returnedValue)) {
                     returnedValue.done(resolve);
                 }
             } else if (queueItem.callback instanceof EasyChain) {
-                queueItem.callback.runQueuesFrom(0).done(resolve);
+                queueItem.callback._runQueuesFrom(0).done(resolve);
             } else if (isJQueryDeferred(queueItem.callback)) {
                 queueItem.callback.done(resolve);
             }
@@ -264,7 +292,7 @@
 
         this.timeoutId = setTimeout(bind(function () {
             this.deferred.reject();
-        }, this), (this.timeout || EasyChain.TIMEOUT_MSEC));
+        }, this), (this.timeout || Queue.TIMEOUT));
 
         return this.deferred.promise();
     };
@@ -274,21 +302,51 @@
     };
 
     Queue.prototype.getValues = function () {
-        if (this.type === Queue.ALL || this.type === Queue.FIRST) {
+        if (this.type === Queue.ALL || this.type === Queue.ANY) {
             return map(this.queueItems, function (queueItem) {
                 return queueItem.value;
             });
         } else if (this.type === Queue.SINGLE) {
             return this.queueItems[0].value;
         } else if (this.type === Queue.WAIT) {
-            return this.queueItems[0].value[0];
+            return this.waitTime;
         }
     };
 
-    Queue.ALL = 'all';
-    Queue.FIRST = 'first';
+    Queue.prototype.getStatus = function () {
+        return this.deferred._status;
+    };
+
+    // - - - - - - - - - - - - - - - - - - -
+    // Public Static Methods
+
+    Queue.createSingleType = function (callbacks, timeout) {
+        callbacks = isArray(callbacks) ? callbacks : [callbacks];
+        return new Queue(Queue.SINGLE, callbacks, timeout);
+    };
+
+    Queue.createAllType = function (callbacks, timeout) {
+        callbacks = isArray(callbacks) ? callbacks : [callbacks];
+        return new Queue(Queue.ALL, callbacks, timeout);
+    };
+
+    Queue.createAnyType = function (callbacks, timeout) {
+        callbacks = isArray(callbacks) ? callbacks : [callbacks];
+        return new Queue(Queue.ANY, callbacks, timeout);
+    };
+
+    Queue.createWaitType = function (msec) {
+        return new Queue(Queue.WAIT, msec);
+    };
+
+    Queue.TIMEOUT = 5000;
     Queue.SINGLE = 'single';
+    Queue.ALL = 'all';
+    Queue.ANY = 'any';
     Queue.WAIT = 'wait';
+    Queue.Events = {
+        TIMEOUT: 'timeout'
+    };
 
     //==================================================================
     // PromiseChain
@@ -297,9 +355,9 @@
         options = options || {};
         this._queues = [];
         this._eventListeners = {};
-        this._eventListeners[EasyChain.COMPLETE] = [];
-        this._eventListeners[EasyChain.TIMEOUT_ERROR] = [];
-        this._eventListeners[EasyChain.PROGRESS] = [];
+        this._eventListeners[EasyChain.Events.COMPLETE] = [];
+        this._eventListeners[EasyChain.Events.TIMEOUT_ERROR] = [];
+        this._eventListeners[EasyChain.Events.PROGRESS] = [];
         this._timeout = options.timeout;
     }
 
@@ -314,36 +372,35 @@
         return this;
     };
 
-    EasyChain.prototype.runQueuesFrom = function (index) {
+    EasyChain.prototype._runQueuesFrom = function (index) {
         var queue = this._queues[index],
             prevQueue = this._queues[index - 1],
             prevQueueValues = prevQueue ? prevQueue.getValues() : undefined,
+            runOption = prevQueue ? {
+                prevQueue: prevQueue
+            } : {},
             deferred = new Deferred();
 
         if (queue) {
             queue
-                .run({
-                    passedValues: prevQueueValues
-                })
+                .run(runOption)
                 .done(bind(function () {
                     this._fireEvent(
-                        EasyChain.PROGRESS,
-                        new Event(EasyChain.PROGRESS, this, {
-                            values: queue.getValues(),
-                            queueType: queue.getType(),
+                        EasyChain.Events.PROGRESS,
+                        new Event(EasyChain.Events.PROGRESS, this, {
+                            queue: queue,
                             index: index
                         })
                     );
-                    this.runQueuesFrom(index + 1).done(function () {
+                    this._runQueuesFrom(index + 1).done(function () {
                         deferred.resolve(queue.getValues());
                     });
                 }, this))
                 .fail(bind(function () {
                     this._fireEvent(
-                        EasyChain.TIMEOUT_ERROR,
-                        new Event(EasyChain.TIMEOUT_ERROR, this, {
-                            values: queue.getValues(),
-                            queueType: queue.getType(),
+                        EasyChain.Events.TIMEOUT_ERROR,
+                        new Event(EasyChain.Events.TIMEOUT_ERROR, this, {
+                            queue: queue,
                             index: index
                         })
                     );
@@ -355,70 +412,14 @@
         return deferred.promise();
     };
 
-    // - - - - - - - - - - - - - - - - - - -
-    // Public Methods
-
-    EasyChain.prototype.single = function (callback) {
-        if (isFunction(callback)) {
-            this._queues.push(new Queue(Queue.SINGLE, this._timeout, [callback]));
-        } else {
-            throw new TypeError("single() takes only function.");
-        }
-        return this;
-    };
-
-    EasyChain.prototype.all = function () {
-        var callbacks = isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments);
-        this._queues.push(new Queue(Queue.ALL, this._timeout, callbacks));
-        return this;
-    };
-
-    EasyChain.prototype.first = function () {
-        var callbacks = isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments);
-        this._queues.push(new Queue(Queue.FIRST, this._timeout, callbacks));
-        return this;
-    };
-
-    EasyChain.prototype.wait = function (msec) {
-        if (isNumber(msec)) {
-            this._queues.push(new Queue(Queue.WAIT, this._timeout, [function (values, next) {
-                setTimeout(function () {
-                    next(msec);
-                }, msec);
-            }]));
-        } else {
-            throw new TypeError("wait() takes only number.");
-        }
-        return this;
-    };
-
-    EasyChain.prototype.run = function () {
-        this.runQueuesFrom(0)
-            .done(bind(function () {
-                this._fireEvent(
-                    EasyChain.COMPLETE,
-                    new Event(EasyChain.COMPLETE, this, {
-                        type: EasyChain.COMPLETE,
-                        length: this._queues.length
-                    })
-                );
-            }, this));
-        return this;
-    };
-
-    EasyChain.prototype.empty = function () {
-        this._queues = [];
-        return this;
-    };
-
-    EasyChain.prototype.on = function (name, callback, context) {
+    EasyChain.prototype._on = function (name, callback, context) {
         if (this._eventListeners[name]) {
             this._eventListeners[name].push(new EventListener(callback, context));
         }
         return this;
     };
 
-    EasyChain.prototype.off = function (name, callback, context) {
+    EasyChain.prototype._off = function (name, callback, context) {
         if (this._eventListeners[name]) {
             if (callback) {
                 this._eventListeners[name] = reject(this._eventListeners[name], function (listener) {
@@ -438,6 +439,56 @@
     };
 
     // - - - - - - - - - - - - - - - - - - -
+    // Public Methods
+
+    EasyChain.prototype.do = function (callback, timeout) {
+        this._queues.push(Queue.createSingleType(callback, timeout));
+        return this;
+    };
+
+    EasyChain.prototype.doAll = function (callbacks, timeout) {
+        this._queues.push(Queue.createAllType(callbacks, timeout));
+        return this;
+    };
+
+    EasyChain.prototype.doAny = function (callbacks, timeout) {
+        this._queues.push(Queue.createAnyType(callbacks, timeout));
+        return this;
+    };
+
+    EasyChain.prototype.wait = function (msec) {
+        this._queues.push(Queue.createWaitType(msec));
+        return this;
+    };
+
+    EasyChain.prototype.run = function () {
+        this._runQueuesFrom(0)
+            .done(bind(function () {
+                this._fireEvent(
+                    EasyChain.Events.COMPLETE,
+                    new Event(EasyChain.Events.COMPLETE, this, {
+                        type: EasyChain.Events.COMPLETE,
+                        length: this._queues.length
+                    })
+                );
+            }, this));
+        return this;
+    };
+
+    EasyChain.prototype.empty = function () {
+        this._queues = [];
+        return this;
+    };
+
+    EasyChain.prototype.on = function (name, callback, context) {
+        return this._on(name, callback, context);
+    };
+
+    EasyChain.prototype.off = function (name, callback, context) {
+        return this._off(name, callback, context);
+    };
+
+    // - - - - - - - - - - - - - - - - - - -
     // Public Static Methods
 
     EasyChain.wait = function (msec) {
@@ -445,27 +496,29 @@
         return instance.wait(msec);
     };
 
-    EasyChain.single = function (callback) {
+    EasyChain.do = function (callback) {
         var instance = new EasyChain();
-        return instance.single(callback);
+        return instance.do(callback);
     };
 
-    EasyChain.all = function () {
+    EasyChain.doAll = function () {
         var instance = new EasyChain();
-        return instance.all.apply(instance, arguments);
+        return instance.doAll.apply(instance, arguments);
     };
 
-    EasyChain.first = function () {
+    EasyChain.doAny = function () {
         var instance = new EasyChain();
-        return instance.first.apply(instance, arguments);
+        return instance.doAny.apply(instance, arguments);
     };
 
-    EasyChain.TIMEOUT_MSEC = 5000;
-    EasyChain.COMPLETE = 'complete';
-    EasyChain.PROGRESS = 'progress';
-    EasyChain.TIMEOUT_ERROR = 'timeout-error';
+    EasyChain.Events = {
+        COMPLETE: 'complete',
+        PROGRESS: 'progress',
+        TIMEOUT_ERROR: 'timeout-error'
+    };
 
     global.EasyChain = EasyChain;
     global.EasyChain.Deferred = Deferred;
+    global.EasyChain.Queue = Queue;
 
 }(this));

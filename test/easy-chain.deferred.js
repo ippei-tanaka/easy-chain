@@ -62,7 +62,7 @@ describe("EasyChain.Deferred", function () {
     describe("Promise object", function () {
         it("should ban reject and resolve methods.", function () {
             var spiedFunction1 = jasmine.createSpy('spiedFunction'),
-                deferred =  new EasyChain.Deferred();
+                deferred = new EasyChain.Deferred();
 
             expect(function () {
                 deferred
