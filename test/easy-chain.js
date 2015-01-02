@@ -1,6 +1,7 @@
 describe("EasyChain", function () {
 
-    var originalTimeout,
+    var originalJasmineTimeout,
+        originalEasyChainTimeout,
         chain,
         chain2,
         chain3,
@@ -8,9 +9,10 @@ describe("EasyChain", function () {
         timeout = 50;
 
     beforeEach(function () {
-        originalTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
+        originalJasmineTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
         jasmine.DEFAULT_TIMEOUT_INTERVAL = 1000;
-        chain = new EasyChain().setTimeout(timeout);
+        originalEasyChainTimeout = EasyChain.TIMEOUT_MSEC;
+        chain = new EasyChain({timeout: timeout});
         chain2 = new EasyChain();
         chain3 = new EasyChain();
         spiedFunction = jasmine.createSpy('spiedFunction');
@@ -288,15 +290,13 @@ describe("EasyChain", function () {
 
 
     it("should wait.", function (done) {
-        chain
+        EasyChain
             .wait(200)
             .single(function (values, next) {
-                console.log(333);
                 spiedFunction();
                 next();
             })
             .on(EasyChain.PROGRESS, function (event) {
-                console.log(event);
                 if (event.index === 0) {
                     spiedFunction();
                     expect(event.queueType).toBe('wait');
@@ -316,111 +316,125 @@ describe("EasyChain", function () {
             done();
         }, 300);
     });
-    /*
 
-     it("should not complete incorrectly nested chains.", function () {
-     var callback = function (next) { next(); };
+    it("should not complete incorrectly nested chains.", function () {
+        var callback = function (values, next) {
+            next();
+        };
 
-     chain
-     .all(
-     chain2
-     .all(callback, callback, callback),
-     chain3
-     .all(callback, callback, callback)
-     .first(function () {}, function () {})
-     )
-     .single(function () {
-     spiedFunction();
-     })
-     .run();
+        chain
+            .all(
+            chain2
+                .all(callback, callback, callback),
+            chain3
+                .all(callback, callback, callback)
+                .first(function () {
+                }, function () {
+                })
+        )
+            .single(function () {
+                spiedFunction();
+            })
+            .run();
 
-     expect(spiedFunction).not.toHaveBeenCalled();
-     });
+        expect(spiedFunction).not.toHaveBeenCalled();
+    });
 
-     it("should on and off event-listeners.", function () {
-     var obj = {},
-     callback =  function () {
-     spiedFunction();
-     };
+    it("should on and off event-listeners.", function () {
+        var obj = {},
+            callback = function () {
+                spiedFunction();
+            };
 
-     chain
-     .single(function (next) { next() })
-     .on(EasyChain.COMPLETE, callback, obj)
-     .on(EasyChain.COMPLETE, function () {}, obj)
-     .off(EasyChain.COMPLETE, callback, {})
-     .run();
+        chain
+            .single(function (values, next) {
+                next()
+            })
+            .on(EasyChain.COMPLETE, callback, obj)
+            .on(EasyChain.COMPLETE, function () {
+            }, obj)
+            .off(EasyChain.COMPLETE, callback, {})
+            .run();
 
-     expect(spiedFunction).not.toHaveBeenCalled();
+        expect(spiedFunction).not.toHaveBeenCalled();
 
-     chain
-     .empty()
-     .single(function (next) { next() })
-     .on(EasyChain.COMPLETE, callback)
-     .on(EasyChain.COMPLETE, callback)
-     .off(EasyChain.COMPLETE, callback)
-     .run();
+        chain
+            .empty()
+            .single(function (values, next) {
+                next()
+            })
+            .on(EasyChain.COMPLETE, callback)
+            .on(EasyChain.COMPLETE, callback)
+            .off(EasyChain.COMPLETE, callback)
+            .run();
 
-     expect(spiedFunction).not.toHaveBeenCalled();
+        expect(spiedFunction).not.toHaveBeenCalled();
 
-     chain
-     .empty()
-     .single(function (next) { next() })
-     .on(EasyChain.PROGRESS, callback)
-     .off(EasyChain.PROGRESS)
-     .run();
+        chain
+            .empty()
+            .single(function (values, next) {
+                next()
+            })
+            .on(EasyChain.PROGRESS, callback)
+            .off(EasyChain.PROGRESS)
+            .run();
 
-     expect(spiedFunction).not.toHaveBeenCalled();
+        expect(spiedFunction).not.toHaveBeenCalled();
 
-     });
+    });
 
-     it("should return instance through static methods.", function (done) {
-     var callback = function (next) { next(); };
 
-     EasyChain
-     .all(callback, callback, callback, EasyChain.first([callback, callback]))
-     .first(
-     EasyChain.wait(100),
-     function () {}
-     )
-     .single(function () {
-     spiedFunction();
-     })
-     .run();
+    it("should return instance through static methods.", function (done) {
+        var callback = function (values, next) {
+            next();
+        };
 
-     expect(spiedFunction).not.toHaveBeenCalled();
+        EasyChain
+            .all(callback, callback, callback, EasyChain.first([callback, callback]))
+            .first(
+            EasyChain.wait(100),
+            function () {
+            }
+        )
+            .single(function () {
+                spiedFunction();
+            })
+            .run();
 
-     setTimeout(function () {
-     expect(spiedFunction).toHaveBeenCalled();
-     done();
-     }, 300);
-     });
+        expect(spiedFunction).not.toHaveBeenCalled();
 
-     it("should be working with jQuery ajax calls.", function (done) {
+        setTimeout(function () {
+            expect(spiedFunction).toHaveBeenCalled();
+            done();
+        }, 300);
+    });
 
-     EasyChain
-     .all(
-     $.getJSON('http://echo.jsontest.com/key1/value1'),
-     $.getJSON('http://echo.jsontest.com/key2/value2').promise(),
-     EasyChain.wait(100)
-     )
-     .single(function (next, values) {
-     expect(values[0][0]).toEqual({"key1": "value1"});
-     expect(values[1][0]).toEqual({"key2": "value2"});
-     //expect(values[2]).toEqual(100);
-     return $.getJSON('http://echo.jsontest.com/key3/value3');
-     })
-     .single(function (next, values) {
-     expect(values[0]).toEqual({"key3": "value3"});
-     next();
-     done();
-     })
-     .setTimeout(5000)
-     .run();
-     });
-     */
+    it("should be working with jQuery ajax calls.", function (done) {
+
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 10000;
+        EasyChain.TIMEOUT_MSEC = 10000;
+        EasyChain.all(
+            $.getJSON('http://echo.jsontest.com/key1/value1'),
+            $.getJSON('http://echo.jsontest.com/key2/value2').promise(),
+            EasyChain.wait(100)
+        )
+        .single(function (values, next) {
+            expect(values[0][0]).toEqual({"key1": "value1"});
+            expect(values[1][0]).toEqual({"key2": "value2"});
+            expect(values[2]).toEqual([100]);
+            return $.getJSON('http://echo.jsontest.com/key3/value3');
+        })
+        .single(function (values, next) {
+            expect(values[0]).toEqual({"key3": "value3"});
+            next();
+            done();
+        })
+        .run();
+    });
 
 
     afterEach(function () {
-        jasmine.DEFAULT_TIMEOUT_INTERVAL = originalTimeout;
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = originalJasmineTimeout;
+        EasyChain.TIMEOUT_MSEC = originalEasyChainTimeout;
     });
 });

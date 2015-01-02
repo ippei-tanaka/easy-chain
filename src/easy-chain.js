@@ -257,6 +257,8 @@
                 }
             } else if (queueItem.callback instanceof EasyChain) {
                 queueItem.callback.runQueuesFrom(0).done(resolve);
+            } else if (isJQueryDeferred(queueItem.callback)) {
+                queueItem.callback.done(resolve);
             }
         }, this));
 
@@ -276,8 +278,10 @@
             return map(this.queueItems, function (queueItem) {
                 return queueItem.value;
             });
-        } else if (this.type === Queue.SINGLE || this.type === Queue.WAIT) {
+        } else if (this.type === Queue.SINGLE) {
             return this.queueItems[0].value;
+        } else if (this.type === Queue.WAIT) {
+            return this.queueItems[0].value[0];
         }
     };
 
@@ -289,13 +293,14 @@
     //==================================================================
     // PromiseChain
 
-    function EasyChain() {
+    function EasyChain(options) {
+        options = options || {};
         this._queues = [];
         this._eventListeners = {};
         this._eventListeners[EasyChain.COMPLETE] = [];
         this._eventListeners[EasyChain.TIMEOUT_ERROR] = [];
         this._eventListeners[EasyChain.PROGRESS] = [];
-        this._timeout = null;
+        this._timeout = options.timeout;
     }
 
     // - - - - - - - - - - - - - - - - - - -
@@ -429,11 +434,6 @@
                 this._eventListeners[name] = [];
             }
         }
-        return this;
-    };
-
-    EasyChain.prototype.setTimeout = function (msec) {
-        this._timeout = msec;
         return this;
     };
 
