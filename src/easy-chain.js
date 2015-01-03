@@ -11,9 +11,9 @@
             return Object.prototype.toString.call(value) === '[object Array]';
         },
 
-        isNumber = function (value) {
-            return typeof value === 'number';
-        },
+        //isNumber = function (value) {
+        //    return typeof value === 'number';
+        //},
 
         isObject = function (value) {
             var type = typeof value;
@@ -24,15 +24,15 @@
             return _arguments.length > 0 ? Array.prototype.slice.call(_arguments) : [];
         },
 
-        createObject = (function () {
-            function F() {
-            }
-
-            return function (o) {
-                F.prototype = o;
-                return new F()
-            };
-        })(),
+        //createObject = (function () {
+        //    function F() {
+        //    }
+        //
+        //    return function (o) {
+        //        F.prototype = o;
+        //        return new F()
+        //    };
+        //})(),
 
         bind = function (func, context) {
             return function () {
@@ -209,8 +209,8 @@
         this.deferred = new Deferred();
         this.value = undefined;
 
-        this.deferred.done(bind(function () {
-            this.value = arrayfy(arguments);
+        this.deferred.done(bind(function (value) {
+            this.value = value;
         }, this));
     }
 
@@ -242,7 +242,7 @@
                     return queueItem.deferred.promise();
                 }))
                 .done(bind(function () {
-                    clearTimeout(this.timeoutId);
+                    this._clearTimeout();
                     this.deferred.resolve();
                 }, this));
         } else if (this.type === Queue.ANY) {
@@ -254,7 +254,7 @@
                     return queueItem.deferred.promise();
                 }))
                 .done(bind(function () {
-                    clearTimeout(this.timeoutId);
+                    this._clearTimeout();
                     this.deferred.resolve();
                 }, this));
         } else if (this.type === Queue.WAIT) {
@@ -267,33 +267,52 @@
         }
     };
 
+    Queue.prototype._runQueueItems = function (options) {
+        options = options || {};
+
+        forEach(this.queueItems, bind(function (queueItem) {
+            var returnedValue;
+            if (isFunction(queueItem.callback)) {
+                returnedValue = queueItem.callback(function () {
+                    queueItem.deferred.resolve(arrayfy(arguments));
+                }, options.prevQueue);
+                if (isJQueryDeferred(returnedValue)) {
+                    returnedValue.done(function () {
+                        queueItem.deferred.resolve(arrayfy(arguments));
+                    });
+                }
+            } else if (queueItem.callback instanceof EasyChain) {
+                queueItem.callback._runQueuesFrom(0).done(function (queues) {
+                    if (queues.length < 2) {
+                        queueItem.deferred.resolve(queues[0]);
+                    } else {
+                        queueItem.deferred.resolve(queues);
+                    }
+                });
+            } else if (isJQueryDeferred(queueItem.callback)) {
+                queueItem.callback.done(function () {
+                    queueItem.deferred.resolve(arrayfy(arguments));
+                });
+            }
+        }, this));
+    };
+
+    Queue.prototype._setTimeout = function () {
+        this.timeoutId = setTimeout(bind(function () {
+            this.deferred.reject();
+        }, this), (this.timeout || Queue.TIMEOUT));
+    };
+
+    Queue.prototype._clearTimeout = function () {
+        clearTimeout(this.timeoutId);
+    };
+
     // - - - - - - - - - - - - - - - - - - -
     // Public Methods
 
     Queue.prototype.run = function (options) {
-        options = options || {};
-
-        forEach(this.queueItems, bind(function (queueItem) {
-            var resolve = function () {
-                    queueItem.deferred.resolve.apply(queueItem.deferred, arrayfy(arguments));
-                },
-                returnedValue;
-            if (isFunction(queueItem.callback)) {
-                returnedValue = queueItem.callback(resolve, options.prevQueue);
-                if (isJQueryDeferred(returnedValue)) {
-                    returnedValue.done(resolve);
-                }
-            } else if (queueItem.callback instanceof EasyChain) {
-                queueItem.callback._runQueuesFrom(0).done(resolve);
-            } else if (isJQueryDeferred(queueItem.callback)) {
-                queueItem.callback.done(resolve);
-            }
-        }, this));
-
-        this.timeoutId = setTimeout(bind(function () {
-            this.deferred.reject();
-        }, this), (this.timeout || Queue.TIMEOUT));
-
+        this._runQueueItems(options);
+        this._setTimeout();
         return this.deferred.promise();
     };
 
@@ -302,7 +321,8 @@
     };
 
     Queue.prototype.getValues = function () {
-        if (this.type === Queue.ALL || this.type === Queue.ANY) {
+        if (this.type === Queue.ALL
+            || this.type === Queue.ANY) {
             return map(this.queueItems, function (queueItem) {
                 return queueItem.value;
             });
@@ -375,7 +395,6 @@
     EasyChain.prototype._runQueuesFrom = function (index) {
         var queue = this._queues[index],
             prevQueue = this._queues[index - 1],
-            prevQueueValues = prevQueue ? prevQueue.getValues() : undefined,
             runOption = prevQueue ? {
                 prevQueue: prevQueue
             } : {},
@@ -392,9 +411,10 @@
                             index: index
                         })
                     );
-                    this._runQueuesFrom(index + 1).done(function () {
-                        deferred.resolve(queue.getValues());
-                    });
+                    this._runQueuesFrom(index + 1).done(bind(function (queues) {
+                        queues.unshift(queue);
+                        deferred.resolve(queues);
+                    }, this));
                 }, this))
                 .fail(bind(function () {
                     this._fireEvent(
@@ -406,7 +426,7 @@
                     );
                 }, this));
         } else {
-            deferred.resolve(prevQueueValues);
+            deferred.resolve([]);
         }
 
         return deferred.promise();
@@ -462,7 +482,7 @@
     };
 
     EasyChain.prototype.run = function () {
-        this._runQueuesFrom(0)
+        return this._runQueuesFrom(0)
             .done(bind(function () {
                 this._fireEvent(
                     EasyChain.Events.COMPLETE,
@@ -472,7 +492,6 @@
                     })
                 );
             }, this));
-        return this;
     };
 
     EasyChain.prototype.empty = function () {
