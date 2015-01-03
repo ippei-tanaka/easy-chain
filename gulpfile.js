@@ -4,7 +4,8 @@ var gulp = require('gulp'),
     runSequence = require('run-sequence'),
     uglify = require('gulp-uglify'),
     clean = require('gulp-clean'),
-    rename = require("gulp-rename");
+    rename = require("gulp-rename"),
+    packageJson = require('./package.json');
 
 gulp.task('default', function (next) {
     runSequence(
@@ -26,7 +27,7 @@ gulp.task('test', function (next) {
 gulp.task('build', function () {
     return gulp.src('src/*.js')
         .pipe(rename(function (path) {
-            path.basename += ".md";
+            path.basename += "-" + packageJson.version;
         }))
         .pipe(gulp.dest('dist'))
         .pipe(rename(function (path) {

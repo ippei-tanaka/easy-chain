@@ -1,11 +1,8 @@
 describe("EasyChain", function () {
 
-    var originalJasmineTimeout,
-        spiedFunction;
+    var spiedFunction;
 
     beforeEach(function () {
-        //originalJasmineTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
-        //jasmine.DEFAULT_TIMEOUT_INTERVAL = 1000;
         spiedFunction = jasmine.createSpy('spiedFunction');
     });
 
@@ -241,8 +238,8 @@ describe("EasyChain", function () {
                     }, 500);
                 }
             ], 100)
-            .on(EasyChain.Events.TIMEOUT_ERROR, function (event) {
-                expect(event.type).toBe(EasyChain.Events.TIMEOUT_ERROR);
+            .on(EasyChain.Events.TIMEOUT, function (event) {
+                expect(event.type).toBe(EasyChain.Events.TIMEOUT);
                 expect(event.target).toBe(chain);
                 expect(event.index).toBe(1);
                 expect(event.queue.getValues()).toEqual([[1], undefined]);
@@ -260,7 +257,7 @@ describe("EasyChain", function () {
                     next()
                 }, 10);
             }, 100)
-            .on(EasyChain.Events.TIMEOUT_ERROR, function () {
+            .on(EasyChain.Events.TIMEOUT, function () {
                 spiedFunction();
             })
             .run();
@@ -420,7 +417,8 @@ describe("EasyChain", function () {
                     function (next) {
                         next(2);
                     },
-                    EasyChain.wait(10)
+                    EasyChain.wait(10),
+                    $.getJSON('http://echo.jsontest.com/key1/value1')
                 ])
             ])
             .doAny([
@@ -429,20 +427,14 @@ describe("EasyChain", function () {
                     expect(prevQueue.getValues()[0]).toEqual([1]);
                     expect(prevQueue.getValues()[1].getValues()[0]).toEqual([2]);
                     expect(prevQueue.getValues()[1].getValues()[1].getValues()).toEqual(10);
+                    expect(prevQueue.getValues()[1].getValues()[2][0]).toEqual({"key1": "value1"});
                 }
             ])
             .do(function (next) {
-                spiedFunction();
                 next();
+                done();
             })
             .run();
-
-        expect(spiedFunction).not.toHaveBeenCalled();
-
-        setTimeout(function () {
-            expect(spiedFunction).toHaveBeenCalled();
-            done();
-        }, 300);
     });
 
 
