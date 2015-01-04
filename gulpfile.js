@@ -1,11 +1,12 @@
 var gulp = require('gulp'),
-    karma  = require('gulp-karma'),
+    karma = require('gulp-karma'),
     notify = require('gulp-notify'),
     runSequence = require('run-sequence'),
     uglify = require('gulp-uglify'),
     clean = require('gulp-clean'),
     rename = require("gulp-rename"),
-    packageJson = require('./package.json');
+    packageJson = require('./package.json'),
+    jsdoc = require("gulp-jsdoc");
 
 gulp.task('default', function (next) {
     runSequence(
@@ -76,4 +77,19 @@ gulp.task('test-with-jquery2', function () {
             title: 'Jasmine Test Failed',
             message: 'One or more tests failed, see the cli for details.'
         }));
+});
+
+gulp.task('doc', function () {
+    return gulp.src('doc')
+        .pipe(clean({force: true}))
+        .on('end', function () {
+            gulp
+                .src([
+                    './src/*.js'
+                ])
+                .pipe(jsdoc.parser())
+                .pipe(jsdoc.generator('./doc', {}, {
+                    outputSourceFiles: false
+                }));
+        });
 });

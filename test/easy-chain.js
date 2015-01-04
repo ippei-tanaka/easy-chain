@@ -11,9 +11,9 @@ describe("EasyChain", function () {
             .do(function (next) {
                 next("He", "llo");
             })
-            .do(function (next, prevQueue) {
+            .do(function (next, prevTask) {
                 spiedFunction();
-                expect(prevQueue.getValues()).toEqual(["He", "llo"]);
+                expect(prevTask.getValues()).toEqual(["He", "llo"]);
                 next();
             })
             .run();
@@ -57,22 +57,22 @@ describe("EasyChain", function () {
     it("should run all functions in parallel with doAll method.", function () {
         EasyChain
             .doAll([
-                function (next, prevQueue) {
+                function (next, prevTask) {
                     spiedFunction();
                     next(1, 2, 3);
-                    expect(prevQueue).toBeUndefined();
+                    expect(prevTask).toBeUndefined();
                 },
-                function (next, prevQueue) {
+                function (next, prevTask) {
                     spiedFunction();
                     next(4, 5);
-                    expect(prevQueue).toBeUndefined();
+                    expect(prevTask).toBeUndefined();
                 }
             ])
             .doAll([
-                function (next, prevQueue) {
+                function (next, prevTask) {
                     spiedFunction();
                     next();
-                    expect(prevQueue.getValues()).toEqual([[1, 2, 3], [4, 5]]);
+                    expect(prevTask.getValues()).toEqual([[1, 2, 3], [4, 5]]);
                 },
                 function (next) {
                     spiedFunction();
@@ -94,13 +94,13 @@ describe("EasyChain", function () {
             ])
             .doAny([
                 function (next) {},
-                function (next, prevQueue) {
-                    expect(prevQueue.getValues()).toEqual([["ABC", "DEF"], undefined, undefined]);
+                function (next, prevTask) {
+                    expect(prevTask.getValues()).toEqual([["ABC", "DEF"], undefined, undefined]);
                 },
                 function (next) { next("HELLO"); }
             ])
-            .do(function (next, prevQueue) {
-                expect(prevQueue.getValues()).toEqual([undefined, undefined, ["HELLO"]]);
+            .do(function (next, prevTask) {
+                expect(prevTask.getValues()).toEqual([undefined, undefined, ["HELLO"]]);
                 next();
             })
             .do(spiedFunction)
@@ -208,14 +208,14 @@ describe("EasyChain", function () {
             .on(EasyChain.Events.PROGRESS, function (event) {
                 expect(event.type).toBe(EasyChain.Events.PROGRESS);
                 if (event.index === 0) {
-                    expect(event.queue.getType()).toBe('single');
-                    expect(event.queue.getValues()).toEqual(["Hi", "Hello"]);
+                    expect(event.task.getType()).toBe('single');
+                    expect(event.task.getValues()).toEqual(["Hi", "Hello"]);
                 } else if (event.index === 1) {
-                    expect(event.queue.getType()).toBe('all');
-                    expect(event.queue.getValues()).toEqual([[1], [2, 3], [4, 5, 6]]);
+                    expect(event.task.getType()).toBe('all');
+                    expect(event.task.getValues()).toEqual([[1], [2, 3], [4, 5, 6]]);
                 } else if (event.index === 2) {
-                    expect(event.queue.getType()).toBe('any');
-                    expect(event.queue.getValues()).toEqual([["H", "E"], ["L"], ["L", "O"]]);
+                    expect(event.task.getType()).toBe('any');
+                    expect(event.task.getValues()).toEqual([["H", "E"], ["L"], ["L", "O"]]);
                 }
                 spiedFunction();
             })
@@ -242,7 +242,7 @@ describe("EasyChain", function () {
                 expect(event.type).toBe(EasyChain.Events.TIMEOUT);
                 expect(event.target).toBe(chain);
                 expect(event.index).toBe(1);
-                expect(event.queue.getValues()).toEqual([[1], undefined]);
+                expect(event.task.getValues()).toEqual([[1], undefined]);
                 done();
             });
 
@@ -310,8 +310,8 @@ describe("EasyChain", function () {
             .on(EasyChain.PROGRESS, function (event) {
                 if (event.index === 0) {
                     spiedFunction();
-                    expect(event.queue.getType()).toBe('wait');
-                    expect(event.queue.getValues()).toEqual(200);
+                    expect(event.task.getType()).toBe('wait');
+                    expect(event.task.getValues()).toEqual(200);
                 }
             })
             .run();
@@ -407,7 +407,7 @@ describe("EasyChain", function () {
     });
 
 
-    it("should return queue record.", function (done) {
+    it("should return task record.", function (done) {
         EasyChain
             .doAll([
                 function (next) {
@@ -423,11 +423,11 @@ describe("EasyChain", function () {
             ])
             .doAny([
                 EasyChain.wait(10),
-                function (next, prevQueue) {
-                    expect(prevQueue.getValues()[0]).toEqual([1]);
-                    expect(prevQueue.getValues()[1].getValues()[0]).toEqual([2]);
-                    expect(prevQueue.getValues()[1].getValues()[1].getValues()).toEqual(10);
-                    expect(prevQueue.getValues()[1].getValues()[2][0]).toEqual({"key1": "value1"});
+                function (next, prevTask) {
+                    expect(prevTask.getValues()[0]).toEqual([1]);
+                    expect(prevTask.getValues()[1].getValues()[0]).toEqual([2]);
+                    expect(prevTask.getValues()[1].getValues()[1].getValues()).toEqual(10);
+                    expect(prevTask.getValues()[1].getValues()[2][0]).toEqual({"key1": "value1"});
                 }
             ])
             .do(function (next) {
@@ -446,14 +446,14 @@ describe("EasyChain", function () {
                 $.getJSON('http://echo.jsontest.com/key2/value2').promise(),
                 EasyChain.wait(100)
             ])
-            .do(function (next, prevQueue) {
-                expect(prevQueue.getValues()[0][0]).toEqual({"key1": "value1"});
-                expect(prevQueue.getValues()[1][0]).toEqual({"key2": "value2"});
-                expect(prevQueue.getValues()[2].getValues()).toEqual(100);
+            .do(function (next, prevTask) {
+                expect(prevTask.getValues()[0][0]).toEqual({"key1": "value1"});
+                expect(prevTask.getValues()[1][0]).toEqual({"key2": "value2"});
+                expect(prevTask.getValues()[2].getValues()).toEqual(100);
                 return $.getJSON('http://echo.jsontest.com/key3/value3');
             })
-            .do(function (next, prevQueue) {
-                expect(prevQueue.getValues()[0]).toEqual({"key3": "value3"});
+            .do(function (next, prevTask) {
+                expect(prevTask.getValues()[0]).toEqual({"key3": "value3"});
                 next();
                 done();
             })
