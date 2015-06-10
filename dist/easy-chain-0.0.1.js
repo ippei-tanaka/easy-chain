@@ -98,9 +98,6 @@
     //==================================================================
     // Promise
 
-    /**
-     * @class Promise
-     */
     function Promise(deferred) {
         this._deferred = deferred;
     }
@@ -520,23 +517,11 @@
         return this;
     };
 
-    /**
-     * Wait
-     * @memberOf EasyChain
-     * @param {number} msec
-     * @returns {EasyChain}
-     */
     EasyChain.prototype.wait = function (msec) {
         this._tasks.push(Task.createWaitType(msec));
         return this;
     };
 
-    /**
-     * Run commands in the queue.
-     * @memberOf EasyChain
-     * @param {number} msec
-     * @returns {Promise}
-     */
     EasyChain.prototype.run = function () {
         return this._runTasksFrom(0)
             .done(bind(function () {
@@ -581,7 +566,6 @@
 
     /**
      * Add commands, all of which will be executed, to the queue.
-     * The queue doesn't proceed until all of commands are done.
      * @method doAll
      * @memberOf EasyChain
      * @param {Array.<function|EasyChain|Deferred>} commands
@@ -593,26 +577,11 @@
         return instance.doAll(commands, timeout);
     };
 
-    /**
-     * Add commands, all of which will be executed, to the queue.
-     * @method doAny
-     * @memberOf EasyChain
-     * @param {Array.<function|EasyChain|Deferred>} commands
-     * @param {number} [timeout]
-     * @returns {EasyChain}
-     */
     EasyChain.doAny = function (tasks, timeout) {
         var instance = new EasyChain();
         return instance.doAny(tasks, timeout);
     };
-    
-    /**
-     * Wait
-     * @method wait
-     * @memberOf EasyChain
-     * @param {number} msec
-     * @returns {EasyChain}
-     */
+
     EasyChain.wait = function (msec) {
         var instance = new EasyChain();
         return instance.wait(msec);

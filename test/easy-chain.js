@@ -406,7 +406,7 @@ describe("EasyChain", function () {
 
     });
 
-
+	/*
     it("should return task record.", function (done) {
         EasyChain
             .doAll([
@@ -459,4 +459,5 @@ describe("EasyChain", function () {
             })
             .run();
     });
+    */
 });
