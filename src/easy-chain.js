@@ -100,6 +100,7 @@
 
     /**
      * @class Promise
+     * @param {Deferred} deferred
      */
     function Promise(deferred) {
         this._deferred = deferred;
@@ -107,12 +108,26 @@
     
     // - - - - - - - - - - - - - - - - - - -
     // Public Methods
-
+    
+    /**
+     * Add a callback that will be executed 
+     * when the promise object is resolved.
+     * @memberOf Promise
+     * @param {function} callback
+     * @returns {Promise}
+     */
     Promise.prototype.done = function (callback) {
         this._deferred.done(callback);
         return this;
     };
 
+    /**
+     * Add a callback that will be executed 
+     * when the promise object is rejected.
+     * @memberOf Promise
+     * @param {function} callback
+     * @returns {Promise}
+     */
     Promise.prototype.fail = function (callback) {
         this._deferred.fail(callback);
         return this;
@@ -121,6 +136,9 @@
     //==================================================================
     // Deferred
 
+    /**
+     * @class Deferred
+     */
     function Deferred() {
         this._doneCallbacks = [];
         this._failCallbacks = [];
@@ -131,6 +149,13 @@
     // - - - - - - - - - - - - - - - - - - -
     // Public Methods
 
+    /**
+     * Resolve the deferred object with optional values 
+     * that will be sent to done callbacks.
+     * @memberOf Deferred
+     * @param {...*} [values]
+     * @returns {Deferred}
+     */
     Deferred.prototype.resolve = function () {
         if (!this._status) {
             this._status = "resolved";
@@ -142,6 +167,13 @@
         return this;
     };
 
+    /**
+     * Reject the deferred object with optional values 
+     * that will be sent to fail callbacks.
+     * @memberOf Deferred
+     * @param {...*} [values]
+     * @returns {Deferred}
+     */
     Deferred.prototype.reject = function () {
         if (!this._status) {
             this._status = "rejected";
@@ -153,6 +185,13 @@
         return this;
     };
 
+    /**
+     * Add a callback that will be executed 
+     * when the deferred object is resolved.
+     * @memberOf Deferred
+     * @param {function} callback
+     * @returns {Deferred}
+     */
     Deferred.prototype.done = function (callback) {
         this._doneCallbacks.push(callback);
         if (this._status === "resolved") {
@@ -161,6 +200,13 @@
         return this;
     };
 
+    /**
+     * Add a callback that will be executed 
+     * when the deferred object is rejected.
+     * @memberOf Deferred
+     * @param {function} callback
+     * @returns {Deferred}
+     */
     Deferred.prototype.fail = function (callback) {
         this._failCallbacks.push(callback);
         if (this._status === "rejected") {
@@ -169,10 +215,20 @@
         return this;
     };
 
+ 	/**
+     * Get the promise object.
+     * @memberOf Deferred
+     * @returns {Promise}
+     */
     Deferred.prototype.promise = function () {
         return new Promise(this);
     };
     
+    /**
+     * Get the status of the deferred object.
+     * @memberOf Deferred
+     * @returns {string}
+     */
     Deferred.prototype.getStatus = function () {
         return this._status;
     };
@@ -180,6 +236,14 @@
     // - - - - - - - - - - - - - - - - - - -
     // Public Static Methods
 
+    /**
+     * Return the promise object that will be resolved 
+     * when all deferred objects are resolved.
+     * @memberOf Deferred
+     * @method whenAllDone
+     * @param {Array.<Deferred|Promise>} deferreds
+     * @returns {Promise}
+     */
     Deferred.whenAllDone = function (deferreds) {
         var _deferred = new Deferred(),
             counter = 0,
@@ -195,6 +259,14 @@
         return _deferred.promise();
     };
 
+    /**
+     * Return the promise object that will be resolved 
+     * when any of deferred objects are resolved.
+     * @memberOf Deferred
+     * @method whenAnyDone
+     * @param {Array.<Deferred|Promise>} deferreds
+     * @returns {Promise}
+     */
     Deferred.whenAnyDone = function (deferreds) {
         var _deferred = new Deferred();
         forEach(deferreds, function (deferred) {
@@ -550,15 +622,36 @@
             }, this));
     };
 
+    /**
+     * Empty the queue.
+     * @memberOf EasyChain
+     * @returns {EasyChain}
+     */
     EasyChain.prototype.empty = function () {
         this._tasks = [];
         return this;
     };
 
+    /**
+     * Add an event listener.
+     * @memberOf EasyChain
+     * @param {string} name - The name of event. Use {@link EasyChain.Events}, instead of raw string.
+     * @param {function} callback - The event listener.
+     * @param {object} [context] - The context of the event listener.
+     * @returns {EasyChain}
+     */
     EasyChain.prototype.on = function (name, callback, context) {
         return this._on(name, callback, context);
     };
 
+    /**
+     * Remove an event listener.
+     * @memberOf EasyChain
+     * @param {string} name - The name of event. Use {@link EasyChain.Events}, instead of raw string.
+     * @param {function} [callback] - The event listener.
+     * @param {object} [context] - The context of the event listener.
+     * @returns {EasyChain}
+     */
     EasyChain.prototype.off = function (name, callback, context) {
         return this._off(name, callback, context);
     };
@@ -618,6 +711,14 @@
         return instance.wait(msec);
     };
 
+	/**
+	 * @namespace 
+  	 * @memberOf EasyChain
+	 * @property {object}  Events - The list of event names.
+	 * @property {string}  Events.COMPLETE
+	 * @property {string}  Events.PROGRESS
+  	 * @property {string}  Events.TIMEOUT
+	 */
     EasyChain.Events = {
         COMPLETE: 'complete',
         PROGRESS: 'progress',

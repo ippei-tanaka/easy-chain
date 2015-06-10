@@ -110,6 +110,13 @@
     
 
     
+        <h3 class="subsection-title">Namespaces</h3>
+
+        <dl>
+            <dt><a href="namespaces.html#EasyChain.Events"><a href="EasyChain.Events.html">Events</a></a></dt>
+            <dd></dd>
+        </dl>
+    
 
     
 
@@ -175,7 +182,7 @@
 <span class="param-type"><a href="EasyChain.html">EasyChain</a></span>
 |
 
-<span class="param-type">Deferred</span>
+<span class="param-type"><a href="Deferred.html">Deferred</a></span>
 
 
             
@@ -350,7 +357,7 @@
             <td class="type">
             
                 
-<span class="param-type">Array.&lt;(function()|<a href="EasyChain.html">EasyChain</a>|Deferred)></span>
+<span class="param-type">Array.&lt;(function()|<a href="EasyChain.html">EasyChain</a>|<a href="Deferred.html">Deferred</a>)></span>
 
 
             
@@ -525,7 +532,7 @@
             <td class="type">
             
                 
-<span class="param-type">Array.&lt;(function()|<a href="EasyChain.html">EasyChain</a>|Deferred)></span>
+<span class="param-type">Array.&lt;(function()|<a href="EasyChain.html">EasyChain</a>|<a href="Deferred.html">Deferred</a>)></span>
 
 
             
@@ -838,7 +845,7 @@
 <span class="param-type"><a href="EasyChain.html">EasyChain</a></span>
 |
 
-<span class="param-type">Deferred</span>
+<span class="param-type"><a href="Deferred.html">Deferred</a></span>
 
 
             
@@ -1013,7 +1020,7 @@
             <td class="type">
             
                 
-<span class="param-type">Array.&lt;(function()|<a href="EasyChain.html">EasyChain</a>|Deferred)></span>
+<span class="param-type">Array.&lt;(function()|<a href="EasyChain.html">EasyChain</a>|<a href="Deferred.html">Deferred</a>)></span>
 
 
             
@@ -1188,7 +1195,7 @@
             <td class="type">
             
                 
-<span class="param-type">Array.&lt;(function()|<a href="EasyChain.html">EasyChain</a>|Deferred)></span>
+<span class="param-type">Array.&lt;(function()|<a href="EasyChain.html">EasyChain</a>|<a href="Deferred.html">Deferred</a>)></span>
 
 
             
@@ -1240,6 +1247,504 @@
             
 
             <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+    
+
+    
+<dl class="details">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <h5>Returns:</h5>
+    
+            
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="EasyChain.html">EasyChain</a></span>
+
+
+    </dd>
+</dl>
+
+        
+
+    
+</dd>
+
+        
+            
+<dt>
+    <h4 class="name" id="empty"><span class="type-signature"></span>empty<span class="signature">()</span><span class="type-signature"> &rarr; {<a href="EasyChain.html">EasyChain</a>}</span></h4>
+
+    
+</dt>
+<dd>
+
+    
+    <div class="description">
+        Empty the queue.
+    </div>
+    
+
+    
+
+    
+
+    
+
+    
+<dl class="details">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <h5>Returns:</h5>
+    
+            
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="EasyChain.html">EasyChain</a></span>
+
+
+    </dd>
+</dl>
+
+        
+
+    
+</dd>
+
+        
+            
+<dt>
+    <h4 class="name" id="off"><span class="type-signature"></span>off<span class="signature">(name, <span class="optional">callback</span>, <span class="optional">context</span>)</span><span class="type-signature"> &rarr; {<a href="EasyChain.html">EasyChain</a>}</span></h4>
+
+    
+</dt>
+<dd>
+
+    
+    <div class="description">
+        Remove an event listener.
+    </div>
+    
+
+    
+
+    
+
+    
+        <h5>Parameters:</h5>
+        
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Argument</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>name</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">The name of event. Use <a href="EasyChain.Events.html">EasyChain.Events</a>, instead of raw string.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>callback</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">The event listener.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>context</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">The context of the event listener.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+    
+
+    
+<dl class="details">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <h5>Returns:</h5>
+    
+            
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="EasyChain.html">EasyChain</a></span>
+
+
+    </dd>
+</dl>
+
+        
+
+    
+</dd>
+
+        
+            
+<dt>
+    <h4 class="name" id="on"><span class="type-signature"></span>on<span class="signature">(name, callback, <span class="optional">context</span>)</span><span class="type-signature"> &rarr; {<a href="EasyChain.html">EasyChain</a>}</span></h4>
+
+    
+</dt>
+<dd>
+
+    
+    <div class="description">
+        Add an event listener.
+    </div>
+    
+
+    
+
+    
+
+    
+        <h5>Parameters:</h5>
+        
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Argument</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>name</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">The name of event. Use <a href="EasyChain.Events.html">EasyChain.Events</a>, instead of raw string.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>callback</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">The event listener.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>context</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">The context of the event listener.</td>
         </tr>
 
     
@@ -1590,13 +2095,13 @@
 </div>
 
 <nav>
-    <h2><a href="index.html">Index</a></h2><h3>Classes</h3><ul><li><a href="EasyChain.html">EasyChain</a></li><li><a href="Promise.html">Promise</a></li></ul>
+    <h2><a href="index.html">Index</a></h2><h3>Classes</h3><ul><li><a href="Deferred.html">Deferred</a></li><li><a href="EasyChain.html">EasyChain</a></li><li><a href="Promise.html">Promise</a></li></ul><h3>Namespaces</h3><ul><li><a href="EasyChain.Events.html">Events</a></li></ul>
 </nav>
 
 <br clear="both">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0-alpha5</a> on Wed Jun 10 2015 14:28:45 GMT-0400 (EDT)
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0-alpha5</a> on Wed Jun 10 2015 16:30:09 GMT-0400 (EDT)
 </footer>
 
 <script> prettyPrint(); </script>
